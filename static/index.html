@@ -36,22 +36,35 @@
   #actions button { min-height: 48px; }
   #send { background: #2563eb; font-size: 17px; }
   #stop { background: #dc2626; }
+  #feed { display: none; flex: 1; overflow-y: auto; flex-direction: column; gap: 8px; }
+  body.receive #feed { display: flex; }
+  body.receive #actions, body.receive #text, body.receive .row { display: none; }
+  .msg { background: #1f2937; border-radius: 10px; padding: 10px; display: flex; gap: 10px; align-items: flex-start; }
+  .msg pre { flex: 1; margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; }
+  .msg button { background: #2563eb; }
+  #feed .empty { color: #9ca3af; text-align: center; margin-top: 40px; }
 </style>
 </head>
 <body>
 <header>
   <h1>TypeBridge</h1>
   <div id="status"></div>
+  <button id="recv">Receive</button>
   <button id="gear" aria-label="Settings">⚙</button>
 </header>
 <div id="settings">
   <label>Token <input id="token" type="password" placeholder="From server output" autocomplete="off"></label>
+  <label>Send to <select id="target">
+    <option value="keys">Laptop keyboard</option>
+    <option value="inbox">Inbox (phones in Receive mode)</option>
+  </select></label>
   <label>Speed <select id="speed">
     <option value="0.01">Fast (10 ms/char)</option>
     <option value="0.05">Human (50 ms/char)</option>
     <option value="0.15">Slow (150 ms/char)</option>
   </select></label>
 </div>
+<div id="feed"><div class="empty">Waiting for messages… send from another device with “Send to: Inbox”.</div></div>
 <div id="actions">
   <button id="live">Live</button>
   <button id="send">Send</button>
@@ -81,10 +94,19 @@
   // end of the sent text, so an edit = Left x suffix, Backspace x removed, type inserted, Right x suffix.
   let sent = [], queue = Promise.resolve(), gen = 0;  // gen bumps on Stop; stale queued chunks skip
   const post = text => fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
-                                        body: JSON.stringify({ text, delay: +$("speed").value }) });
+                                        body: JSON.stringify({ text, delay: +$("speed").value, to: $("target").value }) });
+  $("target").value = localStorage.getItem("target") || "keys";
+  const applyTarget = () => {
+    const inbox = $("target").value === "inbox";
+    if (inbox && live()) $("live").click();            // live deltas make no sense as inbox messages
+    $("live").disabled = inbox;
+    $("status").textContent = inbox ? "→ Inbox" : "→ Laptop";
+  };
+  $("target").onchange = () => { localStorage.setItem("target", $("target").value); applyTarget(); };
   $("speed").value = localStorage.getItem("speed") || "0.01";
   $("speed").onchange = () => localStorage.setItem("speed", $("speed").value);
   const live = () => $("live").classList.contains("on");
+  applyTarget();
   $("live").onclick = () => {
     $("live").classList.toggle("on");
     sent = live() ? Array.from($("text").value) : [];
@@ -139,6 +161,34 @@
       const r = await fetch("/stop", { method: "POST", headers: { "X-Token": $("token").value } });
       $("status").textContent = r.ok ? "Stopped" : `Error ${r.status}: ${r.statusText}`;
     } catch (e) { $("status").textContent = "Server unreachable"; }
+  };
+  // Receive mode: live feed of inbox messages, one-tap copy.
+  let es = null;
+  const copy = async text => {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch (e) {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+      ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok;
+    }
+  };
+  $("recv").onclick = () => {
+    const on = document.body.classList.toggle("receive");
+    $("recv").classList.toggle("on", on);
+    if (!on) { es && es.close(); es = null; $("status").textContent = ""; applyTarget(); return; }
+    $("status").textContent = "Listening…";
+    es = new EventSource(`/inbox?token=${encodeURIComponent($("token").value)}`);
+    es.onmessage = e => {
+      const text = JSON.parse(e.data);
+      const card = document.createElement("div"); card.className = "msg";
+      const pre = document.createElement("pre"); pre.textContent = text;
+      const b = document.createElement("button"); b.textContent = "Copy";
+      b.onclick = async () => { b.textContent = (await copy(text)) ? "Copied" : "Failed"; setTimeout(() => b.textContent = "Copy", 1500); };
+      card.append(pre, b);
+      const empty = $("feed").querySelector(".empty"); empty && empty.remove();
+      $("feed").prepend(card);
+      $("status").textContent = "New message";
+    };
+    es.onerror = () => { $("status").textContent = "Reconnecting…"; };
   };
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>

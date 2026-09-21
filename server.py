@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""TypeBridge: phone -> laptop keystroke relay. Run: python server.py"""
+"""TypeBridge: any browser -> this laptop's keyboard, or -> any browser's inbox. Run: ./run.sh"""
 import argparse
 import hmac
+import html
 import json
+import os
 import re
 import secrets
 import socket
+import subprocess
 import sys
 import threading
 import time
+from urllib.parse import parse_qs, urlsplit
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -21,6 +25,12 @@ TOKEN = ""
 DELAY = 0.01
 LOCK = threading.Lock()  # ponytail: one typing job at a time, no queue
 STOP = threading.Event()  # set by POST /stop; aborts the current typing job
+
+# Inbox: messages for browsers in Receive mode (phones can't inject keys, so they copy instead).
+INBOX = []  # [(id, text)], newest last, capped
+INBOX_MAX = 50
+COND = threading.Condition()
+PAIR_URL = ""
 
 
 # Control chars the client may embed in text; everything else is typed literally.
@@ -70,9 +80,76 @@ def token_ok(header):
     return bool(header) and hmac.compare_digest(header, TOKEN)
 
 
+def inbox_add(text):
+    with COND:
+        INBOX.append(((INBOX[-1][0] + 1) if INBOX else 1, text))
+        del INBOX[:-INBOX_MAX]
+        COND.notify_all()
+
+
+def sse_events(after):
+    """Yield SSE frames for inbox entries with id > after, then block; ': ping' on 20 s idle."""
+    while True:
+        with COND:
+            new = [(i, t) for i, t in INBOX if i > after]
+            if not new and not COND.wait(20):
+                yield ": ping\n\n"
+                continue
+        for i, t in new:
+            after = i
+            yield f"id: {i}\ndata: {json.dumps(t)}\n\n"
+
+
+def qr_svg(url):
+    import qrcode
+    import qrcode.image.svg
+
+    return qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=12).to_string().decode()
+
+
+def pair_page():
+    return f"""<!doctype html><meta charset=utf-8><title>Pair TypeBridge</title>
+<body style="margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+gap:24px;background:#111827;color:#e5e7eb;font:18px system-ui">
+<h1 style="margin:0">Scan with your phone</h1>
+<div style="background:#fff;padding:16px;border-radius:16px">{qr_svg(PAIR_URL)}</div>
+<code style="font-size:15px;user-select:all">{html.escape(PAIR_URL)}</code></body>"""
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(STATIC), **kw)
+
+    def do_GET(self):
+        url = urlsplit(self.path)
+        if url.path == "/pair":
+            if self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.send_error(403, "open /pair on the laptop itself")
+            return self.send_html(pair_page())
+        if url.path == "/inbox":
+            q = parse_qs(url.query)
+            if not token_ok(q.get("token", [""])[0]):
+                return self.send_error(401, "bad token")
+            after = int(q.get("after", [self.headers.get("Last-Event-ID") or 0])[0])
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            try:
+                for frame in sse_events(after):
+                    self.wfile.write(frame.encode())
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                return
+        return super().do_GET()
+
+    def send_html(self, body):
+        data = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         if self.path not in ("/type", "/stop", "/key"):
@@ -93,15 +170,18 @@ class Handler(SimpleHTTPRequestHandler):
                     press_key(str(body["key"]), [str(m) for m in body.get("mods", [])])
                 self.send_response(204)
                 return self.end_headers()
-            text, delay = body["text"], body.get("delay")
+            text, delay, to = body["text"], body.get("delay"), body.get("to", "keys")
             if delay is not None:
                 float(delay)
         except (ValueError, KeyError, TypeError, AttributeError):
-            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?} or {\"key\": ..., \"mods\": [...]}")
+            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?, \"to\": \"keys\"|\"inbox\"} or {\"key\": ..., \"mods\": [...]}")
         if not isinstance(text, str) or len(text) > MAX_CHARS:
             return self.send_error(413, f"max {MAX_CHARS} chars")
-        with LOCK:
-            type_text(text, delay)
+        if to == "inbox":
+            inbox_add(text)
+        else:
+            with LOCK:
+                type_text(text, delay)
         self.send_response(204)
         self.end_headers()
 
@@ -131,22 +211,41 @@ def load_token(cli):
     return t
 
 
+def check_platform():
+    if sys.platform == "darwin":
+        # pynput silently no-ops without Accessibility permission
+        import ctypes
+        ax = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
+        if not ax.AXIsProcessTrusted():
+            print("WARNING: no Accessibility permission. Opening the pane: enable your terminal app "
+                  "(iTerm/Terminal/VS Code), then quit and relaunch it.")
+            subprocess.run(["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"])
+    elif sys.platform.startswith("linux") and os.environ.get("XDG_SESSION_TYPE") == "wayland":
+        print("WARNING: Wayland session. Keystrokes only reach XWayland apps; log in with an X11 session for full support.")
+
+
+def print_qr(url):
+    import qrcode
+
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(url)
+    qr.print_ascii(invert=True)
+
+
 def main():
-    global TOKEN, DELAY
+    global TOKEN, DELAY, PAIR_URL
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=5050)
     p.add_argument("--token", help="shared secret (default: token.txt, auto-created)")
     p.add_argument("--delay", type=float, default=DELAY, help="default seconds between keystrokes (client can override per request)")
     a = p.parse_args()
     TOKEN, DELAY = load_token(a.token), a.delay
-    if sys.platform == "darwin":
-        # pynput silently no-ops without Accessibility permission
-        import ctypes
-        ax = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
-        if not ax.AXIsProcessTrusted():
-            print("WARNING: no Accessibility permission. System Settings > Privacy & Security > "
-                  "Accessibility > enable your terminal app, then quit and relaunch it.")
-    print(f"Open on phone:  http://{local_ip()}:{a.port}/?token={TOKEN}")
+    check_platform()
+    PAIR_URL = f"http://{local_ip()}:{a.port}/?token={TOKEN}"
+    print_qr(PAIR_URL)
+    print(f"Scan the QR, or open:  {PAIR_URL}")
+    print(f"       or by name:     http://{socket.gethostname().split('.')[0]}.local:{a.port}/?token={TOKEN}")
+    print(f"Big QR on this laptop: http://127.0.0.1:{a.port}/pair")
     print("Ctrl-C to stop.", flush=True)
     ThreadingHTTPServer(("0.0.0.0", a.port), Handler).serve_forever()
 

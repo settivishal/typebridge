@@ -69,4 +69,29 @@ for bad in [("bogus", []), ("left", ["meta"]), ("", [])]:
     except ValueError:
         pass
 
+# --- inbox + SSE ---------------------------------------------------------
+server.INBOX.clear()
+for i in range(server.INBOX_MAX + 5):
+    server.inbox_add(f"m{i}")
+assert len(server.INBOX) == server.INBOX_MAX and server.INBOX[-1] == (server.INBOX_MAX + 5, f"m{server.INBOX_MAX + 4}")
+gen = server.sse_events(after=server.INBOX[-2][0])
+assert next(gen) == f'id: {server.INBOX[-1][0]}\ndata: "m{server.INBOX_MAX + 4}"\n\n'
+threading.Timer(0.05, server.inbox_add, ["late \"quoted\"\nline"]).start()
+assert next(gen).endswith('data: "late \\"quoted\\"\\nline"\n\n')
+
+# --- /pair is loopback-only -----------------------------------------------
+server.PAIR_URL = "http://1.2.3.4:5050/?token=abc"
+assert "<svg" in server.pair_page() and "token=abc" in server.pair_page()
+
+
+class FakeReq(server.Handler):
+    def __init__(self, ip):
+        self.client_address, self.path, self.headers, self.out = (ip, 0), "/pair", {}, []
+    def send_error(self, code, msg=None): self.out.append(code)
+    def send_html(self, body): self.out.append(200)
+
+
+for ip, want in [("127.0.0.1", 200), ("::1", 200), ("192.168.0.9", 403)]:
+    r = FakeReq(ip); r.do_GET(); assert r.out == [want], (ip, r.out)
+
 print("ok")
