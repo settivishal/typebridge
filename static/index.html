@@ -11,51 +11,71 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; }
-  body { display: flex; flex-direction: column; background: #111827; color: #e5e7eb;
-         font: 16px system-ui, sans-serif; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
-  h1 { font-size: 18px; margin: 12px 0 8px; }
-  textarea { flex: 1; width: 100%; resize: none; font: inherit; padding: 12px; border-radius: 10px;
-             border: 1px solid #374151; background: #1f2937; color: inherit; }
-  input { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid #374151;
-          background: #1f2937; color: inherit; margin: 8px 0; }
-  button { width: 100%; font: inherit; font-weight: 600; padding: 14px; margin: 8px 0; border: 0;
-           border-radius: 10px; background: #2563eb; color: #fff; }
+  body { display: flex; flex-direction: column; gap: 8px; background: #111827; color: #e5e7eb;
+         font: 16px system-ui, sans-serif;
+         padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 8px); }
+  header { display: flex; align-items: center; gap: 10px; }
+  h1 { font-size: 18px; margin: 0; }
+  #status { flex: 1; font-size: 14px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px;
+           background: #374151; color: #fff; }
   button:disabled { opacity: .5; }
-  #keys { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  #keys button { width: auto; flex: 1 0 auto; padding: 10px 8px; margin: 0; background: #374151; font-size: 15px; }
-  #keys button.mod.on { background: #2563eb; }
-  #status { min-height: 1.4em; font-size: 14px; color: #9ca3af; margin-bottom: 8px; }
+  button.on { background: #2563eb; }
+  #gear { min-width: 44px; padding: 0; font-size: 20px; }
+  #settings { display: none; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: #1f2937; }
+  #settings.open { display: flex; }
+  #settings label { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  input, select { flex: 1; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid #374151;
+                  background: #111827; color: inherit; min-width: 0; }
+  textarea { flex: 1; min-height: 120px; width: 100%; resize: none; font: inherit; padding: 12px; border-radius: 10px;
+             border: 1px solid #374151; background: #1f2937; color: inherit; }
+  .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  #actions { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 6px; }
+  #actions button { min-height: 52px; }
+  #send { background: #2563eb; font-size: 17px; }
+  #stop { background: #dc2626; }
 </style>
 </head>
 <body>
-<h1>TypeBridge</h1>
-<textarea id="text" placeholder="Text to type on laptop…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
-<input id="token" type="password" placeholder="Token (from server output)" autocomplete="off">
-<div id="keys">
+<header>
+  <h1>TypeBridge</h1>
+  <div id="status"></div>
+  <button id="gear" aria-label="Settings">⚙</button>
+</header>
+<div id="settings">
+  <label>Token <input id="token" type="password" placeholder="From server output" autocomplete="off"></label>
+  <label>Speed <select id="speed">
+    <option value="0.01">Fast (10 ms/char)</option>
+    <option value="0.05">Human (50 ms/char)</option>
+    <option value="0.15">Slow (150 ms/char)</option>
+  </select></label>
+</div>
+<textarea id="text" placeholder="Type here…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+<div class="row mods">
   <button class="mod" data-mod="ctrl">Ctrl</button><button class="mod" data-mod="alt">Alt</button>
   <button class="mod" data-mod="shift">Shift</button><button class="mod" data-mod="cmd">Cmd</button>
   <button data-key="esc">Esc</button><button data-key="tab">Tab</button>
-  <button data-key="left">←</button><button data-key="up">↑</button><button data-key="down">↓</button><button data-key="right">→</button>
-  <button data-key="home">Home</button><button data-key="end">End</button>
-  <button data-key="backspace">⌫</button><button data-key="delete">Del</button><button data-key="enter">⏎</button>
 </div>
-<label>Speed: <select id="speed" style="font:inherit;padding:6px;border-radius:8px;background:#1f2937;color:inherit;border:1px solid #374151">
-  <option value="0.01">Fast (10 ms/char)</option>
-  <option value="0.05">Human (50 ms/char)</option>
-  <option value="0.15">Slow (150 ms/char)</option>
-</select></label>
-<label><input id="live" type="checkbox" style="width:auto;margin:0 6px 0 0">Live: type as you go (no Send)</label>
-<button id="send">Send</button>
-<button id="stop" style="background:#dc2626">Stop</button>
-<div id="status"></div>
+<div class="row keys">
+  <button data-key="home">⇤</button><button data-key="left">←</button><button data-key="up">↑</button>
+  <button data-key="down">↓</button><button data-key="right">→</button><button data-key="end">⇥</button>
+  <button data-key="backspace">⌫</button><button data-key="delete">Del</button>
+</div>
+<div id="actions">
+  <button id="live">Live</button>
+  <button id="send">Send</button>
+  <button id="stop">Stop</button>
+</div>
 <script>
   const $ = id => document.getElementById(id);
   const q = new URLSearchParams(location.search).get("token");
   if (q) { localStorage.setItem("token", q); history.replaceState(null, "", "/"); }
   $("token").value = localStorage.getItem("token") || "";
   $("token").oninput = () => localStorage.setItem("token", $("token").value);
+  $("gear").onclick = () => $("settings").classList.toggle("open");
+  if (!$("token").value) $("settings").classList.add("open");
 
   // Live mode: diff textarea against what was last sent. Laptop caret is assumed to sit at the
   // end of the sent text, so an edit = Left x suffix, Backspace x removed, type inserted, Right x suffix.
@@ -64,9 +84,15 @@
                                         body: JSON.stringify({ text, delay: +$("speed").value }) });
   $("speed").value = localStorage.getItem("speed") || "0.01";
   $("speed").onchange = () => localStorage.setItem("speed", $("speed").value);
-  $("live").onchange = () => { sent = $("live").checked ? Array.from($("text").value) : []; };
+  const live = () => $("live").classList.contains("on");
+  $("live").onclick = () => {
+    $("live").classList.toggle("on");
+    sent = live() ? Array.from($("text").value) : [];
+    $("send").textContent = live() ? "Clear" : "Send";
+    $("status").textContent = live() ? "Live: typing as you go" : "";
+  };
   $("text").oninput = () => {
-    if (!$("live").checked) return;
+    if (!live()) return;
     const now = Array.from($("text").value);
     let p = 0; while (p < sent.length && p < now.length && sent[p] === now[p]) p++;
     let q = 0; while (q < sent.length - p && q < now.length - p && sent[sent.length - 1 - q] === now[now.length - 1 - q]) q++;
@@ -83,7 +109,7 @@
   $("send").onclick = async () => {
     const text = $("text").value;
     if (!text) return;
-    if ($("live").checked) { $("text").value = ""; sent = []; return; }  // already typed; just clear
+    if (live()) { $("text").value = ""; sent = []; return; }  // already typed; just clear
     $("send").disabled = true; $("status").textContent = "Typing…";
     try {
       const r = await post(text);
@@ -94,13 +120,13 @@
   };
   // Special keys row. Modifiers are sticky for one key press.
   const mods = new Set();
-  document.querySelectorAll("#keys .mod").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".mod").forEach(b => b.onclick = () => {
     mods.has(b.dataset.mod) ? mods.delete(b.dataset.mod) : mods.add(b.dataset.mod);
     b.classList.toggle("on");
   });
-  document.querySelectorAll("#keys [data-key]").forEach(b => b.onclick = async () => {
+  document.querySelectorAll("[data-key]").forEach(b => b.onclick = async () => {
     const body = JSON.stringify({ key: b.dataset.key, mods: [...mods] });
-    mods.clear(); document.querySelectorAll("#keys .mod.on").forEach(m => m.classList.remove("on"));
+    mods.clear(); document.querySelectorAll(".mod.on").forEach(m => m.classList.remove("on"));
     try {
       const r = await fetch("/key", { method: "POST", headers: { "X-Token": $("token").value }, body });
       $("status").textContent = r.ok ? `Sent ${b.textContent}` : `Error ${r.status}: ${r.statusText}`;
