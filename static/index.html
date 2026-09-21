@@ -30,6 +30,11 @@
 <h1>TypeBridge</h1>
 <textarea id="text" placeholder="Text to type on laptop…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
 <input id="token" type="password" placeholder="Token (from server output)" autocomplete="off">
+<label>Speed: <select id="speed" style="font:inherit;padding:6px;border-radius:8px;background:#1f2937;color:inherit;border:1px solid #374151">
+  <option value="0.01">Fast (10 ms/char)</option>
+  <option value="0.05">Human (50 ms/char)</option>
+  <option value="0.15">Slow (150 ms/char)</option>
+</select></label>
 <label><input id="live" type="checkbox" style="width:auto;margin:0 6px 0 0">Live: type as you go (no Send)</label>
 <button id="send">Send</button>
 <div id="status"></div>
@@ -44,7 +49,9 @@
   // end of the sent text, so an edit = Left x suffix, Backspace x removed, type inserted, Right x suffix.
   let sent = [], queue = Promise.resolve();
   const post = text => fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
-                                        body: JSON.stringify({ text }) });
+                                        body: JSON.stringify({ text, delay: +$("speed").value }) });
+  $("speed").value = localStorage.getItem("speed") || "0.01";
+  $("speed").onchange = () => localStorage.setItem("speed", $("speed").value);
   $("live").onchange = () => { sent = $("live").checked ? Array.from($("text").value) : []; };
   $("text").oninput = () => {
     if (!$("live").checked) return;

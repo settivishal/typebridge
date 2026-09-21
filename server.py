@@ -33,9 +33,10 @@ def segments(text):
     return [s for s in SPLIT.split(text) if s]
 
 
-def type_text(text):
+def type_text(text, delay=None):
     from pynput.keyboard import Controller, Key
 
+    delay = DELAY if delay is None else min(max(float(delay), 0), 1)
     kb = Controller()
     for seg in segments(text):
         if seg in KEYS:
@@ -43,7 +44,7 @@ def type_text(text):
         else:
             for ch in seg:
                 kb.type(ch)
-                time.sleep(DELAY)
+                time.sleep(delay)
 
 
 def token_ok(header):
@@ -63,13 +64,16 @@ class Handler(SimpleHTTPRequestHandler):
         if length > MAX_CHARS * 4:
             return self.send_error(413)
         try:
-            text = json.loads(self.rfile.read(length))["text"]
+            body = json.loads(self.rfile.read(length))
+            text, delay = body["text"], body.get("delay")
+            if delay is not None:
+                float(delay)
         except (ValueError, KeyError, TypeError):
-            return self.send_error(400, "expected JSON {\"text\": ...}")
+            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?}")
         if not isinstance(text, str) or len(text) > MAX_CHARS:
             return self.send_error(413, f"max {MAX_CHARS} chars")
         with LOCK:
-            type_text(text)
+            type_text(text, delay)
         self.send_response(204)
         self.end_headers()
 
@@ -104,7 +108,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=5050)
     p.add_argument("--token", help="shared secret (default: token.txt, auto-created)")
-    p.add_argument("--delay", type=float, default=DELAY, help="seconds between keystrokes")
+    p.add_argument("--delay", type=float, default=DELAY, help="default seconds between keystrokes (client can override per request)")
     a = p.parse_args()
     TOKEN, DELAY = load_token(a.token), a.delay
     if sys.platform == "darwin":
