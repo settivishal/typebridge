@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TypeBridge</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: #111827; color: #e5e7eb;
+         font: 16px system-ui, sans-serif; padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom); }
+  h1 { font-size: 18px; margin: 12px 0 8px; }
+  textarea { flex: 1; width: 100%; resize: none; font: inherit; padding: 12px; border-radius: 10px;
+             border: 1px solid #374151; background: #1f2937; color: inherit; }
+  input { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid #374151;
+          background: #1f2937; color: inherit; margin: 8px 0; }
+  button { width: 100%; font: inherit; font-weight: 600; padding: 14px; margin: 8px 0; border: 0;
+           border-radius: 10px; background: #2563eb; color: #fff; }
+  button:disabled { opacity: .5; }
+  #status { min-height: 1.4em; font-size: 14px; color: #9ca3af; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>TypeBridge</h1>
+<textarea id="text" placeholder="Text to type on laptop…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+<input id="token" type="password" placeholder="Token (from server output)" autocomplete="off">
+<button id="send">Send</button>
+<div id="status"></div>
+<script>
+  const $ = id => document.getElementById(id);
+  const q = new URLSearchParams(location.search).get("token");
+  if (q) { localStorage.setItem("token", q); history.replaceState(null, "", "/"); }
+  $("token").value = localStorage.getItem("token") || "";
+  $("token").oninput = () => localStorage.setItem("token", $("token").value);
+
+  $("send").onclick = async () => {
+    const text = $("text").value;
+    if (!text) return;
+    $("send").disabled = true; $("status").textContent = "Typing…";
+    try {
+      const r = await fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
+                                       body: JSON.stringify({ text }) });
+      if (r.ok) { $("text").value = ""; $("status").textContent = `Typed ${text.length} chars`; }
+      else $("status").textContent = `Error ${r.status}: ${r.statusText}`;
+    } catch (e) { $("status").textContent = "Server unreachable"; }
+    $("send").disabled = false;
+  };
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>
