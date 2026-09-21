@@ -48,7 +48,7 @@
 
   // Live mode: diff textarea against what was last sent. Laptop caret is assumed to sit at the
   // end of the sent text, so an edit = Left x suffix, Backspace x removed, type inserted, Right x suffix.
-  let sent = [], queue = Promise.resolve();
+  let sent = [], queue = Promise.resolve(), gen = 0;  // gen bumps on Stop; stale queued chunks skip
   const post = text => fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
                                         body: JSON.stringify({ text, delay: +$("speed").value }) });
   $("speed").value = localStorage.getItem("speed") || "0.01";
@@ -63,8 +63,9 @@
                 + now.slice(p, now.length - q).join("") + "\x12".repeat(q);
     sent = now;
     if (!delta) return;
-    queue = queue.then(() => post(delta)).then(r => {
-      $("status").textContent = r.ok ? "Live" : `Error ${r.status}: ${r.statusText}`;
+    const g = gen;
+    queue = queue.then(() => g === gen && post(delta)).then(r => {
+      if (r) $("status").textContent = r.ok ? "Live" : `Error ${r.status}: ${r.statusText}`;
     }, () => { $("status").textContent = "Server unreachable"; });
   };
 
@@ -81,6 +82,7 @@
     $("send").disabled = false;
   };
   $("stop").onclick = async () => {
+    gen++; sent = Array.from($("text").value);  // drop queued live chunks; laptop may now lag the box
     try {
       const r = await fetch("/stop", { method: "POST", headers: { "X-Token": $("token").value } });
       $("status").textContent = r.ok ? "Stopped" : `Error ${r.status}: ${r.statusText}`;
