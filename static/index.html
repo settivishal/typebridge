@@ -37,6 +37,7 @@
 </select></label>
 <label><input id="live" type="checkbox" style="width:auto;margin:0 6px 0 0">Live: type as you go (no Send)</label>
 <button id="send">Send</button>
+<button id="stop" style="background:#dc2626">Stop</button>
 <div id="status"></div>
 <script>
   const $ = id => document.getElementById(id);
@@ -78,6 +79,12 @@
       else $("status").textContent = `Error ${r.status}: ${r.statusText}`;
     } catch (e) { $("status").textContent = "Server unreachable"; }
     $("send").disabled = false;
+  };
+  $("stop").onclick = async () => {
+    try {
+      const r = await fetch("/stop", { method: "POST", headers: { "X-Token": $("token").value } });
+      $("status").textContent = r.ok ? "Stopped" : `Error ${r.status}: ${r.statusText}`;
+    } catch (e) { $("status").textContent = "Server unreachable"; }
   };
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>

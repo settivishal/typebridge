@@ -65,7 +65,8 @@ The token is generated on first run and saved in `token.txt` (stable across rest
 2. On the phone, open the URL from the server output (the `?token=` part saves the token in the page).
 3. Type, tap **Send**. Newlines become Enter, tabs become Tab.
 4. **Speed** picks the per-character delay on the laptop — useful when you paste a block and want it to appear as if typed by hand.
-5. Or tick **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** then just clears the box.
+5. **Stop** aborts whatever the laptop is currently typing.
+6. Or tick **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** then just clears the box.
 
 ## 5. Install as a home-screen app (PWA)
 
@@ -88,7 +89,7 @@ Without the flag, "Add to Home screen" still works but opens as a normal browser
 - Every send requires the token (`X-Token` header, constant-time compared). Wrong/missing token → 401.
 - Traffic is **plain HTTP**: the token is visible to anyone sniffing your Wi-Fi. Fine on a home network you control; don't use on public/hotel/office Wi-Fi.
 - Run it only while you need it (Ctrl-C). Never port-forward it or expose it beyond the LAN.
-- Requests are capped at 20,000 characters and typed one at a time, so a stray send can't tie up the laptop indefinitely — but a 20k paste still takes ~3–4 minutes at the default delay. Change the token (`--token` or delete `token.txt`) if you think it leaked.
+- Requests are capped at 20,000 characters and typed one at a time, so a stray send can't tie up the laptop indefinitely — but a 20k paste still takes ~3–4 minutes at the default delay — tap **Stop** on the phone to abort. Change the token (`--token` or delete `token.txt`) if you think it leaked.
 
 ## Test
 

@@ -19,7 +19,8 @@ MAX_CHARS = 20_000
 
 TOKEN = ""
 DELAY = 0.01
-LOCK = threading.Lock()  # ponytail: one typing job at a time, no queue/cancel
+LOCK = threading.Lock()  # ponytail: one typing job at a time, no queue
+STOP = threading.Event()  # set by POST /stop; aborts the current typing job
 
 
 # Control chars the client may embed in text; everything else is typed literally.
@@ -38,11 +39,14 @@ def type_text(text, delay=None):
 
     delay = DELAY if delay is None else min(max(float(delay), 0), 1)
     kb = Controller()
+    STOP.clear()
     for seg in segments(text):
         if seg in KEYS:
             kb.tap(getattr(Key, KEYS[seg]))
         else:
             for ch in seg:
+                if STOP.is_set():
+                    return
                 kb.type(ch)
                 time.sleep(delay)
 
@@ -56,10 +60,14 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=str(STATIC), **kw)
 
     def do_POST(self):
-        if self.path != "/type":
+        if self.path not in ("/type", "/stop"):
             return self.send_error(404)
         if not token_ok(self.headers.get("X-Token")):
             return self.send_error(401, "bad token")
+        if self.path == "/stop":
+            STOP.set()
+            self.send_response(204)
+            return self.end_headers()
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_CHARS * 4:
             return self.send_error(413)
