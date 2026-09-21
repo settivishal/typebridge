@@ -22,10 +22,15 @@ DELAY = 0.01
 LOCK = threading.Lock()  # ponytail: one typing job at a time, no queue/cancel
 
 
+# Control chars the client may embed in text; everything else is typed literally.
+KEYS = {"\n": "enter", "\t": "tab", "\x08": "backspace", "\x11": "left", "\x12": "right"}
+SPLIT = re.compile("([%s])" % "".join(KEYS))
+
+
 def segments(text):
     """Split into typed runs and control keys: 'a\\r\\nb\\tc' -> ['a','\\n','b','\\t','c']."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    return [s for s in re.split(r"(\n|\t)", text) if s]
+    return [s for s in SPLIT.split(text) if s]
 
 
 def type_text(text):
@@ -33,10 +38,8 @@ def type_text(text):
 
     kb = Controller()
     for seg in segments(text):
-        if seg == "\n":
-            kb.tap(Key.enter)
-        elif seg == "\t":
-            kb.tap(Key.tab)
+        if seg in KEYS:
+            kb.tap(getattr(Key, KEYS[seg]))
         else:
             for ch in seg:
                 kb.type(ch)

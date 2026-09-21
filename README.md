@@ -64,6 +64,7 @@ The token is generated on first run and saved in `token.txt` (stable across rest
 1. Click into the field on the laptop you want to type into.
 2. On the phone, open the URL from the server output (the `?token=` part saves the token in the page).
 3. Type, tap **Send**. Newlines become Enter, tabs become Tab.
+4. Or tick **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** then just clears the box.
 
 ## 5. Install as a home-screen app (PWA)
 

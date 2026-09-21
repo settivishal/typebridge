@@ -30,6 +30,7 @@
 <h1>TypeBridge</h1>
 <textarea id="text" placeholder="Text to type on laptop…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
 <input id="token" type="password" placeholder="Token (from server output)" autocomplete="off">
+<label><input id="live" type="checkbox" style="width:auto;margin:0 6px 0 0">Live: type as you go (no Send)</label>
 <button id="send">Send</button>
 <div id="status"></div>
 <script>
@@ -39,13 +40,33 @@
   $("token").value = localStorage.getItem("token") || "";
   $("token").oninput = () => localStorage.setItem("token", $("token").value);
 
+  // Live mode: diff textarea against what was last sent. Laptop caret is assumed to sit at the
+  // end of the sent text, so an edit = Left x suffix, Backspace x removed, type inserted, Right x suffix.
+  let sent = [], queue = Promise.resolve();
+  const post = text => fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
+                                        body: JSON.stringify({ text }) });
+  $("live").onchange = () => { sent = $("live").checked ? Array.from($("text").value) : []; };
+  $("text").oninput = () => {
+    if (!$("live").checked) return;
+    const now = Array.from($("text").value);
+    let p = 0; while (p < sent.length && p < now.length && sent[p] === now[p]) p++;
+    let q = 0; while (q < sent.length - p && q < now.length - p && sent[sent.length - 1 - q] === now[now.length - 1 - q]) q++;
+    const delta = "\x11".repeat(q) + "\b".repeat(sent.length - p - q)
+                + now.slice(p, now.length - q).join("") + "\x12".repeat(q);
+    sent = now;
+    if (!delta) return;
+    queue = queue.then(() => post(delta)).then(r => {
+      $("status").textContent = r.ok ? "Live" : `Error ${r.status}: ${r.statusText}`;
+    }, () => { $("status").textContent = "Server unreachable"; });
+  };
+
   $("send").onclick = async () => {
     const text = $("text").value;
     if (!text) return;
+    if ($("live").checked) { $("text").value = ""; sent = []; return; }  // already typed; just clear
     $("send").disabled = true; $("status").textContent = "Typing…";
     try {
-      const r = await fetch("/type", { method: "POST", headers: { "X-Token": $("token").value },
-                                       body: JSON.stringify({ text }) });
+      const r = await post(text);
       if (r.ok) { $("text").value = ""; $("status").textContent = `Typed ${text.length} chars`; }
       else $("status").textContent = `Error ${r.status}: ${r.statusText}`;
     } catch (e) { $("status").textContent = "Server unreachable"; }
