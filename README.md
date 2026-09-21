@@ -65,8 +65,9 @@ The token is generated on first run and saved in `token.txt` (stable across rest
 2. On the phone, open the URL from the server output (the `?token=` part saves the token in the page).
 3. Type, tap **Send**. Newlines become Enter, tabs become Tab.
 4. **Speed** picks the per-character delay on the laptop — useful when you paste a block and want it to appear as if typed by hand.
-5. **Stop** aborts whatever the laptop is currently typing.
-6. Or tick **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** then just clears the box.
+5. The key row sends Esc/Tab/arrows/Home/End/⌫/Del/Enter. Tap **Ctrl/Alt/Shift/Cmd** first to hold it for the next key (e.g. Ctrl + ← for word jump).
+6. **Stop** aborts whatever the laptop is currently typing.
+7. Or tick **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** then just clears the box.
 
 ## 5. Install as a home-screen app (PWA)
 

@@ -23,6 +23,9 @@
   button { width: 100%; font: inherit; font-weight: 600; padding: 14px; margin: 8px 0; border: 0;
            border-radius: 10px; background: #2563eb; color: #fff; }
   button:disabled { opacity: .5; }
+  #keys { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  #keys button { width: auto; flex: 1 0 auto; padding: 10px 8px; margin: 0; background: #374151; font-size: 15px; }
+  #keys button.mod.on { background: #2563eb; }
   #status { min-height: 1.4em; font-size: 14px; color: #9ca3af; margin-bottom: 8px; }
 </style>
 </head>
@@ -30,6 +33,14 @@
 <h1>TypeBridge</h1>
 <textarea id="text" placeholder="Text to type on laptop…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
 <input id="token" type="password" placeholder="Token (from server output)" autocomplete="off">
+<div id="keys">
+  <button class="mod" data-mod="ctrl">Ctrl</button><button class="mod" data-mod="alt">Alt</button>
+  <button class="mod" data-mod="shift">Shift</button><button class="mod" data-mod="cmd">Cmd</button>
+  <button data-key="esc">Esc</button><button data-key="tab">Tab</button>
+  <button data-key="left">←</button><button data-key="up">↑</button><button data-key="down">↓</button><button data-key="right">→</button>
+  <button data-key="home">Home</button><button data-key="end">End</button>
+  <button data-key="backspace">⌫</button><button data-key="delete">Del</button><button data-key="enter">⏎</button>
+</div>
 <label>Speed: <select id="speed" style="font:inherit;padding:6px;border-radius:8px;background:#1f2937;color:inherit;border:1px solid #374151">
   <option value="0.01">Fast (10 ms/char)</option>
   <option value="0.05">Human (50 ms/char)</option>
@@ -81,6 +92,21 @@
     } catch (e) { $("status").textContent = "Server unreachable"; }
     $("send").disabled = false;
   };
+  // Special keys row. Modifiers are sticky for one key press.
+  const mods = new Set();
+  document.querySelectorAll("#keys .mod").forEach(b => b.onclick = () => {
+    mods.has(b.dataset.mod) ? mods.delete(b.dataset.mod) : mods.add(b.dataset.mod);
+    b.classList.toggle("on");
+  });
+  document.querySelectorAll("#keys [data-key]").forEach(b => b.onclick = async () => {
+    const body = JSON.stringify({ key: b.dataset.key, mods: [...mods] });
+    mods.clear(); document.querySelectorAll("#keys .mod.on").forEach(m => m.classList.remove("on"));
+    try {
+      const r = await fetch("/key", { method: "POST", headers: { "X-Token": $("token").value }, body });
+      $("status").textContent = r.ok ? `Sent ${b.textContent}` : `Error ${r.status}: ${r.statusText}`;
+    } catch (e) { $("status").textContent = "Server unreachable"; }
+  });
+
   $("stop").onclick = async () => {
     gen++; sent = Array.from($("text").value);  // drop queued live chunks; laptop may now lag the box
     try {

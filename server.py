@@ -51,6 +51,21 @@ def type_text(text, delay=None):
                 time.sleep(delay)
 
 
+MODS = ("ctrl", "alt", "shift", "cmd")
+
+
+def press_key(name, mods):
+    """Tap one key (pynput Key name like 'left', 'esc', 'f5', or a single char) with modifiers held."""
+    from pynput.keyboard import Controller, Key
+
+    key = name if len(name) == 1 else getattr(Key, name, None)
+    if not key or any(m not in MODS for m in mods):
+        raise ValueError(name)
+    kb = Controller()
+    with kb.pressed(*[getattr(Key, m) for m in mods]):
+        kb.tap(key)
+
+
 def token_ok(header):
     return bool(header) and hmac.compare_digest(header, TOKEN)
 
@@ -60,7 +75,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=str(STATIC), **kw)
 
     def do_POST(self):
-        if self.path not in ("/type", "/stop"):
+        if self.path not in ("/type", "/stop", "/key"):
             return self.send_error(404)
         if not token_ok(self.headers.get("X-Token")):
             return self.send_error(401, "bad token")
@@ -73,11 +88,16 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_error(413)
         try:
             body = json.loads(self.rfile.read(length))
+            if self.path == "/key":
+                with LOCK:
+                    press_key(str(body["key"]), [str(m) for m in body.get("mods", [])])
+                self.send_response(204)
+                return self.end_headers()
             text, delay = body["text"], body.get("delay")
             if delay is not None:
                 float(delay)
-        except (ValueError, KeyError, TypeError):
-            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?}")
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?} or {\"key\": ..., \"mods\": [...]}")
         if not isinstance(text, str) or len(text) > MAX_CHARS:
             return self.send_error(413, f"max {MAX_CHARS} chars")
         with LOCK:
