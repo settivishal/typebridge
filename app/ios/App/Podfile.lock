@@ -1,0 +1,28 @@
+PODS:
+  - Capacitor (8.5.2):
+    - CapacitorCordova
+  - CapacitorCordova (8.5.2)
+  - CapacitorZeroconf (4.0.0):
+    - Capacitor
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - CapacitorZeroconf (from `../../node_modules/capacitor-zeroconf`)
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorZeroconf:
+    :path: "../../node_modules/capacitor-zeroconf"
+
+SPEC CHECKSUMS:
+  Capacitor: 89067779e14fb7ea56af07b4817f45d1f0c2a269
+  CapacitorCordova: 5bec5648cbd09a176ce34ce5e7b6cdabb2c8a327
+  CapacitorZeroconf: 32e19c259908ca1b97af27aeff25c26b8e948021
+
+PODFILE CHECKSUM: 6c136feb20fc8f821286bfefd6815c5f76234f93
+
+COCOAPODS: 1.17.0

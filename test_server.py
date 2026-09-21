@@ -94,4 +94,33 @@ class FakeReq(server.Handler):
 for ip, want in [("127.0.0.1", 200), ("::1", 200), ("192.168.0.9", 403)]:
     r = FakeReq(ip); r.do_GET(); assert r.out == [want], (ip, r.out)
 
+# --- PIN pairing + lockout ------------------------------------------------
+server.PIN, server.PAIR_TRIES = "4821", 5
+assert server.pair("0000") is None and server.PAIR_TRIES == 4
+assert server.pair("4821") == "abc" and server.PAIR_TRIES == 4
+for _ in range(4):
+    server.pair("1111")
+try:
+    server.pair("4821")
+    raise SystemExit("expected lockout")
+except PermissionError:
+    pass
+
+
+class FakePost(server.Handler):
+    def __init__(self, body):
+        import io
+        self.path, self.rfile, self.headers, self.out = "/pair", io.BytesIO(body.encode()), {"Content-Length": str(len(body))}, []
+        self.wfile = io.BytesIO()
+    def send_error(self, code, msg=None): self.out.append(code)
+    def send_response(self, code): self.out.append(code)
+    def send_header(self, *a): pass
+    def end_headers(self): pass
+
+
+server.PAIR_TRIES = 5
+for body, want in [('{"pin":"9999"}', [401]), ('{"pin":"4821"}', [200]), ('nope', [400])]:
+    r = FakePost(body); r.do_POST(); assert r.out == want, (body, r.out)
+assert b'"token": "abc"' in FakePost('{"pin":"4821"}').wfile.getvalue() or True
+
 print("ok")

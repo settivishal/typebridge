@@ -47,6 +47,7 @@ The terminal prints a QR code and two URLs:
 Scan the QR, or open:  http://192.168.1.42:5050/?token=Xk3...
        or by name:     http://my-laptop.local:5050/?token=Xk3...
 Big QR on this laptop: http://127.0.0.1:5050/pair
+Phone app pairing PIN: 4821
 Ctrl-C to stop.
 ```
 
@@ -87,10 +88,28 @@ Chrome only offers a real "Install app" on HTTPS. This server is plain HTTP on a
 
 Without the flag, "Add to Home screen" still works but opens as a normal browser tab.
 
-## 6. Security — read this
+## 6. Phone app (finds the laptop by itself)
+
+No QR, no IP: the app lists every laptop on the Wi-Fi running TypeBridge (mDNS `_typebridge._tcp`), you tap one, type the 4-digit PIN from the terminal once, and it opens the same web UI. Thin [Capacitor](https://capacitorjs.com) shell around the existing page — `app/www/index.html` is the whole app.
+
+```bash
+cd app
+npm install
+npx cap sync
+npx cap open ios       # Xcode → pick your iPhone → Run (free Apple ID works; re-sign every 7 days)
+npx cap open android   # Android Studio → Run on a real device (emulators don't see LAN mDNS)
+```
+
+Requirements: Node 18+, Xcode + CocoaPods (`brew install cocoapods`) for iOS, Android Studio for Android. First launch on iPhone asks for Local Network permission — allow it.
+
+- **⇄ Laptop** in the top bar goes back to the list. Pairings are remembered per laptop; the app auto-reconnects to the last one.
+- **Enter address manually** for networks that block mDNS (some corporate/guest Wi-Fi).
+- PIN changes every server start; 5 wrong tries lock pairing until restart. Already-paired phones keep working (they hold the token).
+
+## 7. Security — read this
 
 - This server lets anyone who can reach it **type anything into whatever has focus on your laptop** — including a terminal. Treat it accordingly.
-- Every request requires the token (`X-Token` header; `?token=` query for the `/inbox` event stream), constant-time compared. Wrong/missing token → 401.
+- The app pairs with a 4-digit PIN (per run, 5 attempts) and receives the token; after that, every request requires the token (`X-Token` header; `?token=` query for the `/inbox` event stream), constant-time compared. Wrong/missing token → 401.
 - Inbox messages are held in memory (last 50) and visible to anyone with the token; they vanish when the server stops.
 - Traffic is **plain HTTP**: the token is visible to anyone sniffing your Wi-Fi. Fine on a home network you control; don't use on public/hotel/office Wi-Fi.
 - Run it only while you need it (Ctrl-C). Never port-forward it or expose it beyond the LAN.

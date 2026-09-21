@@ -1,0 +1,12 @@
+{
+  "appId": "dev.typebridge.app",
+  "appName": "TypeBridge",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "ios": {
+    "allowsLinkPreview": false
+  }
+}

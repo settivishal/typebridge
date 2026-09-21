@@ -31,6 +31,8 @@ INBOX = []  # [(id, text)], newest last, capped
 INBOX_MAX = 50
 COND = threading.Condition()
 PAIR_URL = ""
+PIN = ""  # 4-digit app pairing code, new each run
+PAIR_TRIES = 5  # wrong PINs left before pairing locks until restart
 
 
 # Control chars the client may embed in text; everything else is typed literally.
@@ -80,6 +82,17 @@ def token_ok(header):
     return bool(header) and hmac.compare_digest(header, TOKEN)
 
 
+def pair(pin):
+    """Return TOKEN for the right PIN, None for wrong; raises PermissionError once locked."""
+    global PAIR_TRIES
+    if PAIR_TRIES <= 0:
+        raise PermissionError
+    if hmac.compare_digest(str(pin), PIN):
+        return TOKEN
+    PAIR_TRIES -= 1
+    return None
+
+
 def inbox_add(text):
     with COND:
         INBOX.append(((INBOX[-1][0] + 1) if INBOX else 1, text))
@@ -122,6 +135,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         url = urlsplit(self.path)
+        if url.path == "/ping":
+            self.send_response(204)
+            return self.end_headers()
         if url.path == "/pair":
             if self.client_address[0] not in ("127.0.0.1", "::1"):
                 return self.send_error(403, "open /pair on the laptop itself")
@@ -152,8 +168,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path not in ("/type", "/stop", "/key"):
+        if self.path not in ("/type", "/stop", "/key", "/pair"):
             return self.send_error(404)
+        if self.path == "/pair":
+            try:
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
+                token = pair(body["pin"])
+            except (ValueError, KeyError, TypeError):
+                return self.send_error(400, "expected JSON {\"pin\": \"1234\"}")
+            except PermissionError:
+                return self.send_error(423, "pairing locked; restart the server")
+            if not token:
+                return self.send_error(401, "wrong PIN")
+            data = json.dumps({"token": token}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
         if not token_ok(self.headers.get("X-Token")):
             return self.send_error(401, "bad token")
         if self.path == "/stop":
@@ -224,6 +256,18 @@ def check_platform():
         print("WARNING: Wayland session. Keystrokes only reach XWayland apps; log in with an X11 session for full support.")
 
 
+def advertise(port):
+    """Announce _typebridge._tcp on the LAN so the phone app can list this laptop. Returns (zc, info)."""
+    from zeroconf import ServiceInfo, Zeroconf
+
+    host = socket.gethostname().split(".")[0]
+    info = ServiceInfo("_typebridge._tcp.local.", f"{host}._typebridge._tcp.local.",
+                       addresses=[socket.inet_aton(local_ip())], port=port, properties={"name": host})
+    zc = Zeroconf()
+    zc.register_service(info)
+    return zc, info
+
+
 def print_qr(url):
     import qrcode
 
@@ -233,7 +277,7 @@ def print_qr(url):
 
 
 def main():
-    global TOKEN, DELAY, PAIR_URL
+    global TOKEN, DELAY, PAIR_URL, PIN
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=5050)
     p.add_argument("--token", help="shared secret (default: token.txt, auto-created)")
@@ -246,8 +290,17 @@ def main():
     print(f"Scan the QR, or open:  {PAIR_URL}")
     print(f"       or by name:     http://{socket.gethostname().split('.')[0]}.local:{a.port}/?token={TOKEN}")
     print(f"Big QR on this laptop: http://127.0.0.1:{a.port}/pair")
+    PIN = f"{secrets.randbelow(10000):04d}"
+    print(f"Phone app pairing PIN: {PIN}")
     print("Ctrl-C to stop.", flush=True)
-    ThreadingHTTPServer(("0.0.0.0", a.port), Handler).serve_forever()
+    zc, info = advertise(a.port)
+    try:
+        ThreadingHTTPServer(("0.0.0.0", a.port), Handler).serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        zc.unregister_service(info)
+        zc.close()
 
 
 if __name__ == "__main__":

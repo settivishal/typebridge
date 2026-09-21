@@ -1,0 +1,18 @@
+{
+  "name": "typebridge-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeBridge phone app: finds laptops on the LAN and shows the TypeBridge web UI",
+  "scripts": {
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "capacitor-zeroconf": "^4.0.0"
+  }
+}

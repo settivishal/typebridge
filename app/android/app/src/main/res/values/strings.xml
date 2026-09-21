@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TypeBridge</string>
+    <string name="title_activity_main">TypeBridge</string>
+    <string name="package_name">dev.typebridge.app</string>
+    <string name="custom_url_scheme">dev.typebridge.app</string>
+</resources>

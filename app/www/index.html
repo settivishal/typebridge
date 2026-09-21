@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TypeBridge</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: #111827; color: #e5e7eb; font: 16px system-ui, sans-serif; }
+  #list, #pin { padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 12px); display: flex; flex-direction: column; gap: 10px; }
+  h1 { font-size: 20px; margin: 4px 0 8px; }
+  .hint { color: #9ca3af; font-size: 14px; }
+  .card { background: #1f2937; border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .card small { color: #9ca3af; display: block; margin-top: 2px; }
+  .card.paired::after { content: "paired"; color: #34d399; font-size: 13px; }
+  button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; }
+  button.ghost { background: transparent; color: #9ca3af; }
+  input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid #374151; background: #1f2937; color: inherit; width: 100%; }
+  #pin input { font-size: 28px; letter-spacing: 8px; text-align: center; }
+  #app { display: none; flex: 1; flex-direction: column; }
+  #bar { display: flex; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top) + 4px) 8px 4px; background: #0b1220; font-size: 14px; }
+  #bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #bar button { min-height: 36px; background: #374151; }
+  iframe { flex: 1; border: 0; width: 100%; }
+  body.connected #app { display: flex; }
+  body.connected #list, body.connected #pin { display: none; }
+  body.pairing #pin { display: flex; }
+  body.pairing #list { display: none; }
+  #pin { display: none; }
+  .err { color: #f87171; font-size: 14px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div id="list">
+  <h1>Laptops</h1>
+  <div class="hint" id="listHint">Looking for TypeBridge on this network… start <code>./run.sh</code> on the laptop.</div>
+  <div id="cards"></div>
+  <button class="ghost" id="manual">Enter address manually</button>
+</div>
+<div id="pin">
+  <h1 id="pinTitle">Pair</h1>
+  <div class="hint">Type the 4-digit PIN shown in the laptop terminal.</div>
+  <input id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code">
+  <div class="err" id="pinErr"></div>
+  <button id="pinGo">Pair</button>
+  <button class="ghost" id="pinBack">Back</button>
+</div>
+<div id="app">
+  <div id="bar"><span id="barName"></span><button id="switch">⇄ Laptop</button></div>
+  <iframe id="frame"></iframe>
+</div>
+<script>
+  const $ = id => document.getElementById(id);
+  const ZeroConf = window.Capacitor && Capacitor.registerPlugin("ZeroConf");
+  const tokens = JSON.parse(localStorage.getItem("tokens") || "{}");   // host:port -> token
+  const hosts = new Map();                                              // host:port -> {name}
+  let current = null;
+
+  const ping = (base, ms = 1500) => {
+    const c = new AbortController(); setTimeout(() => c.abort(), ms);
+    return fetch(`${base}/ping`, { signal: c.signal }).then(r => r.status === 204, () => false);
+  };
+
+  function render() {
+    $("cards").replaceChildren();
+    for (const [key, h] of hosts) {
+      const d = document.createElement("div");
+      d.className = "card" + (tokens[key] ? " paired" : "");
+      const label = document.createElement("div"), sub = document.createElement("small");
+      label.textContent = h.name; sub.textContent = key; label.append(sub); d.append(label);
+      d.onclick = () => connect(key, h.name);
+      $("cards").append(d);
+    }
+    $("listHint").textContent = hosts.size ? "Tap a laptop to connect." : "Looking for TypeBridge on this network… start ./run.sh on the laptop.";
+  }
+
+  function connect(key, name) {
+    current = { key, name };
+    if (!tokens[key]) { $("pinTitle").textContent = `Pair with ${name}`; $("pinInput").value = ""; $("pinErr").textContent = "";
+                        document.body.classList.add("pairing"); $("pinInput").focus(); return; }
+    $("frame").src = `http://${key}/?token=${encodeURIComponent(tokens[key])}`;
+    $("barName").textContent = name;
+    document.body.classList.remove("pairing"); document.body.classList.add("connected");
+    localStorage.setItem("last", JSON.stringify(current));
+  }
+
+  $("pinGo").onclick = async () => {
+    $("pinErr").textContent = "";
+    try {
+      const r = await fetch(`http://${current.key}/pair`, { method: "POST", body: JSON.stringify({ pin: $("pinInput").value }) });
+      if (r.status === 401) return $("pinErr").textContent = "Wrong PIN";
+      if (r.status === 423) return $("pinErr").textContent = "Pairing locked — restart the server";
+      if (!r.ok) return $("pinErr").textContent = `Error ${r.status}`;
+      tokens[current.key] = (await r.json()).token;
+      localStorage.setItem("tokens", JSON.stringify(tokens));
+      connect(current.key, current.name);
+    } catch (e) { $("pinErr").textContent = "Can't reach laptop"; }
+  };
+  $("pinInput").onkeydown = e => { if (e.key === "Enter") $("pinGo").click(); };
+  $("pinBack").onclick = () => document.body.classList.remove("pairing");
+  $("switch").onclick = () => { document.body.classList.remove("connected"); $("frame").src = "about:blank"; render(); };
+
+  $("manual").onclick = async () => {
+    const key = prompt("Laptop address (ip:port)", "192.168.1.10:5050");
+    if (!key) return;
+    if (!(await ping(`http://${key}`))) return alert("No TypeBridge at " + key);
+    hosts.set(key, { name: key }); render(); connect(key, key);
+  };
+
+  // Discovery: laptops advertise _typebridge._tcp; keep the list live.
+  if (ZeroConf) {
+    ZeroConf.watch({ type: "_typebridge._tcp.", domain: "local." }, ({ action, service }) => {
+      const ip = (service.ipv4Addresses || [])[0];
+      if (!ip) return;
+      const key = `${ip}:${service.port}`;
+      if (action === "removed") hosts.delete(key);
+      else hosts.set(key, { name: service.txtRecord?.name || service.name });
+      render();
+    }).catch(e => { $("listHint").textContent = "Discovery unavailable: " + (e.message || e); });
+  } else {
+    $("listHint").textContent = "Not running inside the app — use “Enter address manually”.";
+  }
+
+  // Auto-reconnect to the last laptop if it answers.
+  (async () => {
+    const last = JSON.parse(localStorage.getItem("last") || "null");
+    if (last && tokens[last.key] && await ping(`http://${last.key}`)) { hosts.set(last.key, { name: last.name }); connect(last.key, last.name); }
+  })();
+  render();
+</script>
+</body>
+</html>
