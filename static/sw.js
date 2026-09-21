@@ -1,4 +1,4 @@
-const CACHE = "typebridge-v2";
+const CACHE = "typebridge-v3";
 const FILES = ["/", "/manifest.json", "/icon.png"];
 self.addEventListener("install", e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))));
 self.addEventListener("fetch", e => {

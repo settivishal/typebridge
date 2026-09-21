@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>TypeBridge</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon.png">
@@ -33,7 +33,7 @@
              border: 1px solid #374151; background: #1f2937; color: inherit; }
   .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
   #actions { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 6px; }
-  #actions button { min-height: 52px; }
+  #actions button { min-height: 48px; }
   #send { background: #2563eb; font-size: 17px; }
   #stop { background: #dc2626; }
 </style>
@@ -52,6 +52,11 @@
     <option value="0.15">Slow (150 ms/char)</option>
   </select></label>
 </div>
+<div id="actions">
+  <button id="live">Live</button>
+  <button id="send">Send</button>
+  <button id="stop">Stop</button>
+</div>
 <textarea id="text" placeholder="Type here…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
 <div class="row mods">
   <button class="mod" data-mod="ctrl">Ctrl</button><button class="mod" data-mod="alt">Alt</button>
@@ -62,11 +67,6 @@
   <button data-key="home">⇤</button><button data-key="left">←</button><button data-key="up">↑</button>
   <button data-key="down">↓</button><button data-key="right">→</button><button data-key="end">⇥</button>
   <button data-key="backspace">⌫</button><button data-key="delete">Del</button>
-</div>
-<div id="actions">
-  <button id="live">Live</button>
-  <button id="send">Send</button>
-  <button id="stop">Stop</button>
 </div>
 <script>
   const $ = id => document.getElementById(id);
