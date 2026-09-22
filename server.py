@@ -133,6 +133,12 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(STATIC), **kw)
 
+    def end_headers(self):
+        # The phone app's WebView origin is capacitor://localhost (iOS) / http://localhost (Android).
+        if self.headers.get("Origin") in ("capacitor://localhost", "http://localhost"):
+            self.send_header("Access-Control-Allow-Origin", self.headers["Origin"])
+        super().end_headers()
+
     def do_GET(self):
         url = urlsplit(self.path)
         if url.path == "/ping":

@@ -16,6 +16,7 @@
   .card.paired::after { content: "paired"; color: #34d399; font-size: 13px; }
   button { font: inherit; font-weight: 600; min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: #2563eb; color: #fff; }
   button.ghost { background: transparent; color: #9ca3af; }
+  #manualForm { display: flex; gap: 8px; margin-top: 12px; } #manualAddr { flex: 1; min-width: 0; padding: 12px; border-radius: 8px; border: 1px solid #374151; background: #111827; color: #e5e7eb; font-size: 16px; }
   input { font: inherit; padding: 12px; border-radius: 10px; border: 1px solid #374151; background: #1f2937; color: inherit; width: 100%; }
   #pin input { font-size: 28px; letter-spacing: 8px; text-align: center; }
   #app { display: none; flex: 1; flex-direction: column; }
@@ -36,7 +37,7 @@
   <h1>Laptops</h1>
   <div class="hint" id="listHint">Looking for TypeBridge on this network… start <code>./run.sh</code> on the laptop.</div>
   <div id="cards"></div>
-  <button class="ghost" id="manual">Enter address manually</button>
+  <form id="manualForm"><input id="manualAddr" placeholder="192.168.1.10:5050" inputmode="url" autocapitalize="off" autocorrect="off"><button class="ghost" id="manual">Connect by address</button></form>
 </div>
 <div id="pin">
   <h1 id="pinTitle">Pair</h1>
@@ -50,9 +51,11 @@
   <div id="bar"><span id="barName"></span><button id="switch">⇄ Laptop</button></div>
   <iframe id="frame"></iframe>
 </div>
+<script src="capacitor.js"></script>
 <script>
+  window.onerror = (m, src, line) => { document.getElementById("listHint").textContent = `JS error: ${m} (line ${line})`; };
   const $ = id => document.getElementById(id);
-  const ZeroConf = window.Capacitor && Capacitor.registerPlugin("ZeroConf");
+  const ZeroConf = capacitorExports.Capacitor.isNativePlatform() && capacitorExports.registerPlugin("ZeroConf");
   const tokens = JSON.parse(localStorage.getItem("tokens") || "{}");   // host:port -> token
   const hosts = new Map();                                              // host:port -> {name}
   let current = null;
@@ -101,10 +104,12 @@
   $("pinBack").onclick = () => document.body.classList.remove("pairing");
   $("switch").onclick = () => { document.body.classList.remove("connected"); $("frame").src = "about:blank"; render(); };
 
-  $("manual").onclick = async () => {
-    const key = prompt("Laptop address (ip:port)", "192.168.1.10:5050");
+  $("manualForm").onsubmit = async e => {
+    e.preventDefault();
+    const key = $("manualAddr").value.trim();
     if (!key) return;
-    if (!(await ping(`http://${key}`))) return alert("No TypeBridge at " + key);
+    $("listHint").textContent = "Checking " + key + "…";
+    if (!(await ping(`http://${key}`))) { $("listHint").textContent = "No TypeBridge at " + key; return; }
     hosts.set(key, { name: key }); render(); connect(key, key);
   };
 
