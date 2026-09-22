@@ -56,6 +56,7 @@
   <label>Token <input id="token" type="password" placeholder="From server output" autocomplete="off"></label>
   <label>Send to <select id="target">
     <option value="keys">Laptop keyboard</option>
+    <option value="paste">Laptop paste (exact indentation, for code)</option>
     <option value="inbox">Inbox (phones in Receive mode)</option>
   </select></label>
   <label>Speed <select id="speed">
@@ -97,10 +98,10 @@
                                         body: JSON.stringify({ text, delay: +$("speed").value, to: $("target").value }) });
   $("target").value = localStorage.getItem("target") || "keys";
   const applyTarget = () => {
-    const inbox = $("target").value === "inbox";
-    if (inbox && live()) $("live").click();            // live deltas make no sense as inbox messages
-    $("live").disabled = inbox;
-    $("status").textContent = inbox ? "→ Inbox" : "→ Laptop";
+    const to = $("target").value, noLive = to !== "keys";
+    if (noLive && live()) $("live").click();           // live deltas make no sense as inbox messages or pastes
+    $("live").disabled = noLive;
+    $("status").textContent = { inbox: "→ Inbox", paste: "→ Paste" }[to] || "→ Laptop";
   };
   $("target").onchange = () => { localStorage.setItem("target", $("target").value); applyTarget(); };
   $("speed").value = localStorage.getItem("speed") || "0.01";

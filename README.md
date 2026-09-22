@@ -60,10 +60,11 @@ The token is generated on first run and saved in `token.txt` (stable across rest
 1. Click into the field on the laptop you want to type into.
 2. On the phone, scan the QR (section 3).
 3. Type, tap **Send**. Newlines become Enter, tabs become Tab.
-4. **⚙ Speed** picks the per-character delay on the laptop — useful when you paste a block and want it to appear as if typed by hand.
-5. Key rows send Esc/Tab/Home/arrows/End/⌫/Del (Enter = newline in the box). Tap **Ctrl/Alt/Shift/Cmd** first to hold it for the next key (e.g. Ctrl + ← for word jump).
-6. **Stop** aborts whatever the laptop is currently typing.
-7. Or tap **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** becomes **Clear**.
+4. Pasting code? Editors auto-indent on Enter, so typed code gets extra indentation. Use **⚙ → Send to: Laptop paste**: the text goes to the laptop clipboard and Cmd/Ctrl+V is pressed — exact, instant. (Overwrites the clipboard; Linux needs `xclip` or `wl-copy`.)
+5. **⚙ Speed** picks the per-character delay on the laptop — useful when you paste a block and want it to appear as if typed by hand.
+6. Key rows send Esc/Tab/Home/arrows/End/⌫/Del (Enter = newline in the box). Tap **Ctrl/Alt/Shift/Cmd** first to hold it for the next key (e.g. Ctrl + ← for word jump).
+7. **Stop** aborts whatever the laptop is currently typing.
+8. Or tap **Live** — each keystroke is sent as you type (edits anywhere in the box are replayed on the laptop with arrow keys + Backspace). **Send** becomes **Clear**.
 
 ### Sending to a phone (or any browser)
 

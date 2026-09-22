@@ -45,6 +45,15 @@ log.clear()
 server.type_text("hi\n\b\x11", delay=0)
 assert log == [("type", "h"), ("type", "i"), ("tap", "ENTER"), ("tap", "BS"), ("tap", "LEFT")], log
 
+# --- paste_text: clipboard + Cmd/Ctrl+V ----------------------------------
+import subprocess
+runs = []
+subprocess.run = lambda cmd, **kw: runs.append((cmd, kw["input"]))
+log.clear()
+server.paste_text("  x\n    y")
+assert runs and b"  x\n    y" in runs[0][1], runs
+assert log == [("hold", ("CMD" if sys.platform == "darwin" else "CTRL",)), ("tap", "v")], log
+
 # --- type_text: STOP aborts mid-run --------------------------------------
 log.clear()
 t = threading.Thread(target=server.type_text, args=("abcdefghij", 0.05))

@@ -63,6 +63,22 @@ def type_text(text, delay=None):
                 time.sleep(delay)
 
 
+def paste_text(text):
+    """Put text on the laptop clipboard and press Cmd/Ctrl+V: exact indentation (editors auto-indent typed newlines)."""
+    from pynput.keyboard import Controller, Key
+
+    if sys.platform == "darwin":
+        cmd, data = ["pbcopy"], text.encode()
+    elif sys.platform == "win32":
+        cmd, data = ["clip"], text.encode("utf-16")  # BOM makes clip.exe read it as Unicode
+    else:
+        cmd, data = (["wl-copy"] if os.environ.get("WAYLAND_DISPLAY") else ["xclip", "-selection", "clipboard"]), text.encode()
+    subprocess.run(cmd, input=data, check=True)
+    kb = Controller()
+    with kb.pressed(Key.cmd if sys.platform == "darwin" else Key.ctrl):
+        kb.tap("v")
+
+
 MODS = ("ctrl", "alt", "shift", "cmd")
 
 
@@ -211,12 +227,17 @@ class Handler(SimpleHTTPRequestHandler):
             text, delay, to = body["text"], body.get("delay"), body.get("to", "keys")
             if delay is not None:
                 float(delay)
+            if to not in ("keys", "inbox", "paste"):
+                raise ValueError
         except (ValueError, KeyError, TypeError, AttributeError):
-            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?, \"to\": \"keys\"|\"inbox\"} or {\"key\": ..., \"mods\": [...]}")
+            return self.send_error(400, "expected JSON {\"text\": ..., \"delay\": seconds?, \"to\": \"keys\"|\"inbox\"|\"paste\"} or {\"key\": ..., \"mods\": [...]}")
         if not isinstance(text, str) or len(text) > MAX_CHARS:
             return self.send_error(413, f"max {MAX_CHARS} chars")
         if to == "inbox":
             inbox_add(text)
+        elif to == "paste":
+            with LOCK:
+                paste_text(text)
         else:
             with LOCK:
                 type_text(text, delay)
