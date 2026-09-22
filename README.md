@@ -100,11 +100,21 @@ npx cap open ios       # Xcode → pick your iPhone → Run (free Apple ID works
 npx cap open android   # Android Studio → Run on a real device (emulators don't see LAN mDNS)
 ```
 
-Requirements: Node 18+, Xcode + CocoaPods (`brew install cocoapods`) for iOS, Android Studio for Android. First launch on iPhone asks for Local Network permission — allow it.
+Requirements: Node 18+, Xcode + CocoaPods (`brew install cocoapods`) for iOS, Android Studio for Android.
 
-- **⇄ Laptop** in the top bar goes back to the list. Pairings are remembered per laptop; the app auto-reconnects to the last one.
-- **Enter address manually** for networks that block mDNS (some corporate/guest Wi-Fi).
-- PIN changes every server start; 5 wrong tries lock pairing until restart. Already-paired phones keep working (they hold the token).
+iPhone, first time: plug in via USB, tap **Trust**, enable **Settings → Privacy & Security → Developer Mode** (reboots). First app launch asks for **Local Network** permission — allow it (otherwise no laptops are found; fix later under Settings → Apps → TypeBridge). Without Xcode's GUI you can also build + install from the terminal:
+
+```bash
+xcrun devicectl list devices                      # get your iPhone's UDID
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -destination 'id=<UDID>' -allowProvisioningUpdates build
+xcrun devicectl device install app --device <UDID> ~/Library/Developer/Xcode/DerivedData/App-*/Build/Products/Debug-iphoneos/App.app
+```
+
+- The PIN pairs as soon as the 4th digit is typed. PIN changes every server start; 5 wrong tries lock pairing until restart. Already-paired phones keep working (they hold the token).
+- Paired laptops stay in the list when offline (greyed); tap to retry. **✕ → Forget?** unpairs. The app auto-reconnects to the last laptop on open.
+- **⇄ Laptop** in the top bar goes back to the list.
+- **Connect by address** (`ip:port`) for networks that block mDNS (some corporate/guest Wi-Fi).
+- `app/www/capacitor.js` is a copy of `@capacitor/core`'s browser bundle (no bundler in this project); refresh it after `npm update`.
 
 ## 7. Security — read this
 
