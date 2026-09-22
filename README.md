@@ -102,13 +102,9 @@ npx cap open android   # Android Studio → Run on a real device (emulators don'
 
 Requirements: Node 18+, Xcode + CocoaPods (`brew install cocoapods`) for iOS, Android Studio for Android.
 
-iPhone, first time: plug in via USB, tap **Trust**, enable **Settings → Privacy & Security → Developer Mode** (reboots). First app launch asks for **Local Network** permission — allow it (otherwise no laptops are found; fix later under Settings → Apps → TypeBridge). Without Xcode's GUI you can also build + install from the terminal:
+iPhone, first time: plug in via USB, tap **Trust**, enable **Settings → Privacy & Security → Developer Mode** (reboots). First app launch asks for **Local Network** permission — allow it (otherwise no laptops are found; fix later under Settings → Apps → TypeBridge). Without Xcode's GUI: `app/install-ios.sh` builds, installs and launches on the plugged-in iPhone. Rerun it when the 7-day free-account signature expires (app just stops opening).
 
-```bash
-xcrun devicectl list devices                      # get your iPhone's UDID
-xcodebuild -workspace ios/App/App.xcworkspace -scheme App -destination 'id=<UDID>' -allowProvisioningUpdates build
-xcrun devicectl device install app --device <UDID> ~/Library/Developer/Xcode/DerivedData/App-*/Build/Products/Debug-iphoneos/App.app
-```
+Sharing: a free Apple ID can't distribute builds, so friends use the QR / home-screen PWA (section 5) instead — same UI, minus auto-discovery.
 
 - The PIN pairs as soon as the 4th digit is typed. PIN changes every server start; 5 wrong tries lock pairing until restart. Already-paired phones keep working (they hold the token).
 - Paired laptops stay in the list when offline (greyed); tap to retry. **✕ → Forget?** unpairs. The app auto-reconnects to the last laptop on open.
